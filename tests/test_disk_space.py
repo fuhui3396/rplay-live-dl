@@ -62,7 +62,8 @@ def test_default_merge_budget_covers_one_temp_copy_plus_reserve(
     raw = tmp_path / "raw.ts"
     raw.write_bytes(b"raw")
     monkeypatch.setattr(
-        "core.disk_space.Path.stat", lambda _: SimpleNamespace(st_size=GIB // 2)
+        "core.disk_space.Path.stat",
+        lambda _path, **_kwargs: SimpleNamespace(st_size=GIB // 2, st_mode=0),
     )
     monkeypatch.setattr(
         "core.disk_space.shutil.disk_usage",
