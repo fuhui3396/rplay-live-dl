@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}录制文件 · rplay-live-dl{% endblock %}
+{% block content %}
+
+<div class="hero">
+  <h1>录制文件</h1>
+  <p class="sub">共 {{ recordings | length }} 个文件，占用 {{ '%.2f' | format(total_size / 1073741824) }} GiB。</p>
+</div>
+
+{% if creators %}
+<div class="filters">
+  <a href="/recordings" class="chip {{ 'active' if not selected_creator }}">全部</a>
+  {% for name in creators %}
+  <a href="/recordings?creator={{ name | urlencode }}" class="chip {{ 'active' if selected_creator == name }}">{{ name }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if recordings %}
+<div class="recordings">
+  {% for item in recordings %}
+  <div class="recording {{ 'raw' if item.is_raw }}">
+    <div class="rec-head">
+      <div>
+        <div class="rec-title">{{ item.filename }}</div>
+        <div class="rec-meta">
+          <span>{{ item.creator }}</span>
+          <span>{{ item.modified_display }}</span>
+          <span>{{ '%.1f' | format(item.size / 1048576) }} MB</span>
+          {% if item.is_merging %}<span class="tag merging">合并中</span>{% endif %}
+          {% if item.is_raw %}<span class="tag raw">原始片段</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% if not item.is_raw %}
+    <video controls preload="metadata" src="/media/{{ item.creator | urlencode }}/{{ item.filename | urlencode }}"></video>
+    {% else %}
+    <p class="hint raw-note">原始 .ts 片段：录制完成后会自动合并成 .mp4 并删除。若长期存在，说明合并失败，可查看日志。</p>
+    {% endif %}
+    <a class="btn small" href="/download/{{ item.creator | urlencode }}/{{ item.filename | urlencode }}">下载</a>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <p class="empty">还没有录制文件。主播开播后会自动出现在这里。</p>
+</div>
+{% endif %}
+
+{% endblock %}

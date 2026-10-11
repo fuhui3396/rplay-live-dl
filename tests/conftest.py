@@ -114,3 +114,46 @@ def skip_retry_backoff(monkeypatch):
         (StreamDownloader, "_build_download_retrying"),
     ):
         monkeypatch.setattr(owner, name, without_backoff(getattr(owner, name)))
+
+
+@pytest.fixture(autouse=True)
+def no_web_auth_env(monkeypatch):
+    """Web auth stays off unless a test opts in, so other tests are unaffected."""
+    monkeypatch.delenv("WEB_USERNAME", raising=False)
+    monkeypatch.delenv("WEB_PASSWORD", raising=False)
+
+
+@pytest.fixture
+def host_root(tmp_path, monkeypatch):
+    """An isolated host project directory wired into web.paths."""
+    from web import paths
+
+    root = tmp_path / "host"
+    (root / "config").mkdir(parents=True)
+    (root / "archive").mkdir()
+    (root / "logs").mkdir()
+    monkeypatch.setattr(paths, "HOST_ROOT", root)
+    return root
+
+
+@pytest.fixture
+def store(host_root):
+    from web.store import ConfigStore
+
+    return ConfigStore(
+        config_path=host_root / "config" / "config.yaml",
+        env_path=host_root / ".env",
+    )
+
+
+@pytest.fixture
+def web_client(host_root, monkeypatch):
+    """A TestClient whose route dependencies point at the tmp host root."""
+    from fastapi.testclient import TestClient
+
+    from web import app as app_module
+    from web import paths
+
+    monkeypatch.setattr(paths, "HOST_ROOT", host_root)
+    monkeypatch.setattr(app_module.paths, "HOST_ROOT", host_root)
+    return TestClient(app_module.create_app())

@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}初始设置 · rplay-live-dl{% endblock %}
+{% block content %}
+
+<div class="hero">
+  <h1>初始设置</h1>
+  <p class="sub">保存后录制进程会在下一次轮询（最多 60 秒）自动生效，无需重启容器。</p>
+</div>
+
+{% if errors %}
+<div class="banner error">
+  {% for error in errors %}<div>{{ error }}</div>{% endfor %}
+</div>
+{% endif %}
+
+{% if saved %}
+<div class="banner success">✓ 已保存</div>
+{% endif %}
+
+{% if check %}
+<div class="banner {{ 'success' if check.ok else 'error' }}">
+  <strong>{{ check.title }}</strong> — {{ check.detail }}
+  {% if not check.ok and check.hint %}<div class="hint">{{ check.hint }}</div>{% endif %}
+</div>
+{% endif %}
+
+<form method="post" action="/setup" class="card">
+  <h2>第 1 步 · RPlay 账号凭证</h2>
+
+  <div class="field">
+    <label for="user_oid">RPlay 用户 ID（User Number）</label>
+    <input type="text" id="user_oid" name="user_oid" required
+           placeholder="在 https://rplay.live/myinfo/ 页面复制 User Number">
+    <p class="help">打开 <a href="https://rplay.live/myinfo/" target="_blank" rel="noopener">rplay.live/myinfo</a>，复制页面上的 User Number。</p>
+  </div>
+
+  <div class="field">
+    <label for="refresh_token">Refresh Token</label>
+    <textarea id="refresh_token" name="refresh_token" rows="4" required
+              placeholder="粘贴 refreshToken"></textarea>
+    <p class="help">在<strong>已登录</strong>的 rplay.live 页面按 <kbd>F12</kbd> → Console → 粘贴下面的脚本回车 → token 自动复制。</p>
+    <details class="code-details">
+      <summary>展开获取脚本</summary>
+      <pre class="code-block">const c = copy;
+const open = indexedDB.open('rplay-account-session');
+open.onsuccess = () => {
+  const req = open.result.transaction('records').objectStore('records').get('session');
+  req.onsuccess = () => {
+    const token = req.result?.session?.refreshToken;
+    token ? (c(token), console.log('✅ REFRESH_TOKEN copied to clipboard')) : console.log('❌ Not found. Make sure you are logged in.');
+  };
+};</pre>
+    </details>
+  </div>
+
+  <div class="field">
+    <label for="api_base_url">API 地址</label>
+    <input type="text" id="api_base_url" name="api_base_url"
+           value="{{ state.config.get('apiBaseUrl', 'https://api.rplay.live') }}">
+    <p class="help">一般不用改。</p>
+  </div>
+
+  <label class="checkline">
+    <input type="checkbox" name="verify" value="1" checked>
+    保存前先验证凭证是否有效（会向 RPlay 发一次请求）
+  </label>
+
+  <button class="btn primary" type="submit">保存凭证</button>
+</form>
+
+<form method="post" action="/setup" class="card">
+  <h2>第 2 步 · 添加要监控的主播</h2>
+  <p class="help">
+    打开主播主页 → <kbd>F12</kbd> → Network 面板 → 刷新页面 → 搜索 <code>CreatorOid</code> → 复制它的值。
+  </p>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="creator_name">主播名称</label>
+      <input type="text" id="creator_name" name="creator_name" placeholder="留空则不添加">
+    </div>
+    <div class="field">
+      <label for="creator_id">Creator OID</label>
+      <input type="text" id="creator_id" name="creator_id" placeholder="24 位十六进制 ID">
+    </div>
+  </div>
+
+  <button class="btn primary" type="submit">保存并添加主播</button>
+</form>
+
+<div class="card">
+  <h2>当前监控列表</h2>
+  {% if state.creators %}
+  <table class="table">
+    <thead><tr><th>名称</th><th>Creator OID</th><th></th></tr></thead>
+    <tbody>
+    {% for creator in state.creators %}
+      <tr>
+        <td>{{ creator.name }}</td>
+        <td><code class="mono">{{ creator.id }}</code></td>
+        <td class="right">
+          <form method="post" action="/api/creators/delete" onsubmit="return confirm('确定删除主播 {{ creator.name }}？');">
+            <input type="hidden" name="creator_oid" value="{{ creator.id }}">
+            <button class="btn danger small" type="submit">删除</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">还没有添加主播。</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>可选：运行参数</h2>
+  <form id="settings-form" onsubmit="return saveSettings(event)">
+    <div class="field-row">
+      <div class="field">
+        <label for="s_interval">轮询间隔（秒）</label>
+        <input type="number" id="s_interval" name="INTERVAL" min="10" max="3600" placeholder="60">
+      </div>
+      <div class="field">
+        <label for="s_disk">最小剩余空间（GiB）</label>
+        <input type="number" id="s_disk" name="MIN_FREE_DISK_GB" min="0" step="0.5" placeholder="5">
+      </div>
+      <div class="field">
+        <label for="s_level">日志级别</label>
+        <select id="s_level" name="LOG_LEVEL">
+          {% for lvl in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] %}
+          <option value="{{ lvl }}">{{ lvl }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="s_webhook">Discord Webhook（可留空）</label>
+      <input type="text" id="s_webhook" name="DISCORD_WEBHOOK_URL" placeholder="https://discord.com/api/webhooks/...">
+      <p class="help">留空则不发送通知。填写后需重建容器。</p>
+    </div>
+    <button class="btn" type="submit">保存运行参数</button>
+    <span id="settings-result" class="inline-result"></span>
+  </form>
+  <p class="hint">环境变量保存在项目的 <code>.env</code> 文件。修改后执行 <code>docker compose up -d --force-recreate</code> 生效。</p>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function saveSettings(event) {
+  event.preventDefault();
+  const values = {};
+  const form = event.target;
+  new FormData(form).forEach((value, key) => { values[key] = value; });
+  const result = document.getElementById('settings-result');
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({values})
+    });
+    const data = await res.json();
+    if (res.ok) {
+      result.textContent = data.changed.length ? '✓ 已保存：' + data.changed.join(', ') : '没有变化';
+      result.className = 'inline-result ok';
+    } else {
+      result.textContent = '✗ ' + (data.detail || '保存失败');
+      result.className = 'inline-result bad';
+    }
+  } catch (err) {
+    result.textContent = '✗ 请求失败';
+    result.className = 'inline-result bad';
+  }
+  return false;
+}
+</script>
+{% endblock %}

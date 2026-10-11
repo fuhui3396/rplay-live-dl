@@ -15,3 +15,35 @@ services:
     # child-process sweep. Docker's 10s default would SIGKILL mid-merge and
     # leave the raw .ts unmerged.
     stop_grace_period: 11m
+
+  # Optional web UI. Browse recordings, manage the monitored creator list and
+  # read logs at http://localhost:8099 .
+  # The project directory is mounted whole so one mount covers .env, config/,
+  # archive/ and logs/ without Docker creating stray directories for files that
+  # do not exist yet.
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    image: rplay-live-dl-web:latest
+    container_name: rplay-live-dl-web
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=${TZ:-Asia/Taipei}
+      - RPLAY_HOST_ROOT=/host
+      # The UI can read and write .env (REFRESH_TOKEN lives there), so LAN
+      # access requires credentials. Set both to enable the login prompt;
+      # leave both empty for an open, loopback-only UI.
+      - WEB_USERNAME=${WEB_USERNAME:-}
+      - WEB_PASSWORD=${WEB_PASSWORD:-}
+    # Run as the host user so files this service writes (.env, config.yaml,
+    # recordings) stay editable from the host. Running as root would leave
+    # root-owned 0600 files that break `docker compose` for the host user.
+    user: "${WEB_UID:-1000}:${WEB_GID:-1000}"
+    volumes:
+      - ./:/host
+    ports:
+      # 0.0.0.0 so other devices on the LAN can reach it. Keep WEB_USERNAME and
+      # WEB_PASSWORD set: without them the UI is unauthenticated.
+      - "8099:8099"
+    restart: unless-stopped

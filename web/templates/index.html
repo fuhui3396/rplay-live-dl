@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}总览 · rplay-live-dl{% endblock %}
+{% block content %}
+
+<div class="hero">
+  <h1>运行总览</h1>
+  <p class="sub">自动监控 RPlay 主播开播并录制。</p>
+</div>
+
+<div class="grid stats">
+  <div class="stat {{ 'good' if state.creators_ready else 'bad' }}">
+    <div class="stat-value">{{ state.creators | length }}</div>
+    <div class="stat-label">监控中的主播</div>
+  </div>
+  <div class="stat {{ 'good' if state.credentials_ready else 'bad' }}">
+    <div class="stat-value">{{ '已配置' if state.credentials_ready else '未配置' }}</div>
+    <div class="stat-label">RPlay 凭证</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="stat-recordings">–</div>
+    <div class="stat-label">已完成的录制</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="stat-free">–</div>
+    <div class="stat-label">归档盘剩余 (GiB)</div>
+  </div>
+</div>
+
+{% if not complete %}
+<div class="card highlight">
+  <h2>三步完成设置</h2>
+  <ol class="steps">
+    <li><strong>获取 RPlay 用户 ID</strong> — 打开 <a href="https://rplay.live/myinfo/" target="_blank" rel="noopener">rplay.live/myinfo</a>，复制页面上的 <em>User Number</em>。</li>
+    <li><strong>获取 Refresh Token</strong> — 在已登录的 rplay.live 页面按 <kbd>F12</kbd> 打开控制台，粘贴下面的脚本并回车，token 会自动复制到剪贴板。</li>
+    <li><strong>添加主播</strong> — 打开主播主页 → Network 面板 → 搜索 <code>CreatorOid</code> → 复制它的值。</li>
+  </ol>
+  <pre class="code-block">const c = copy;
+const open = indexedDB.open('rplay-account-session');
+open.onsuccess = () => {
+  const req = open.result.transaction('records').objectStore('records').get('session');
+  req.onsuccess = () => {
+    const token = req.result?.session?.refreshToken;
+    token ? (c(token), console.log('✅ REFRESH_TOKEN copied to clipboard')) : console.log('❌ Not found. Make sure you are logged in.');
+  };
+};</pre>
+  <a class="btn primary big" href="/setup">前往设置页面 →</a>
+</div>
+{% endif %}
+
+<div class="two-col">
+  <div class="card">
+    <div class="card-head">
+      <h2>监控中的主播</h2>
+      <a class="btn small" href="/setup">管理</a>
+    </div>
+    {% if state.creators %}
+    <table class="table">
+      <thead><tr><th>名称</th><th>Creator OID</th></tr></thead>
+      <tbody>
+      {% for creator in state.creators %}
+        <tr>
+          <td>{{ creator.name }}</td>
+          <td><code class="mono">{{ creator.id }}</code></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">还没有添加任何主播。</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>环境变量</h2><a class="btn small" href="/setup">编辑</a></div>
+    <table class="table">
+      <tbody>
+      {% for field in env_fields %}
+        <tr>
+          <td>{{ field.label }}</td>
+          <td>
+            {% if field.secret %}
+              {% if state.env_status[field.key].set %}
+                <span class="badge ok">已设置</span>
+              {% else %}
+                <span class="badge off">未设置</span>
+              {% endif %}
+            {% else %}
+              {% if state.env_status[field.key].set %}<span class="badge ok">已设置</span>{% else %}<span class="badge off">使用默认值</span>{% endif %}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="hint">修改环境变量后需要执行 <code>docker compose up -d --force-recreate</code> 才会生效。</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>最近的日志</h2><a class="btn small" href="/logs">查看全部</a></div>
+  <pre class="log-preview" id="log-preview">加载中…</pre>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+fetch('/api/status').then(r => r.json()).then(d => {
+  document.getElementById('stat-recordings').textContent = d.recordings;
+  document.getElementById('stat-free').textContent = d.free_gb;
+}).catch(() => {});
+fetch('/api/logs?level=INFO').then(r => r.json()).then(d => {
+  const el = document.getElementById('log-preview');
+  if (!d.entries.length) { el.textContent = '暂无日志。请确认录制容器正在运行。'; return; }
+  el.textContent = d.entries.slice(-20).map(e => e.message).join('\n');
+}).catch(() => {
+  document.getElementById('log-preview').textContent = '无法读取日志。';
+});
+</script>
+{% endblock %}

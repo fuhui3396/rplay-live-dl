@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}运行日志 · rplay-live-dl{% endblock %}
+{% block content %}
+
+<div class="hero">
+  <h1>运行日志</h1>
+  {% if log_mtime %}
+  <p class="sub">最新写入：{{ log_mtime.astimezone().strftime('%Y-%m-%d %H:%M:%S') }}</p>
+  {% endif %}
+</div>
+
+<div class="filters">
+  {% for lvl in ['DEBUG', 'INFO', 'WARNING', 'ERROR'] %}
+  <a href="/logs?level={{ lvl }}" class="chip {{ 'active' if level == lvl }}">{{ lvl }}</a>
+  {% endfor %}
+  <a href="/logs" class="btn small right-auto">刷新</a>
+</div>
+
+<div class="card">
+  {% if entries %}
+  <pre class="log-full">{% for entry in entries %}{{ entry.message }}
+{% endfor %}</pre>
+  {% else %}
+  <p class="empty">没有匹配的日志。请确认录制容器正在运行，且日志级别不低于 {{ level }}。</p>
+  {% endif %}
+</div>
+
+{% endblock %}

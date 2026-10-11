@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}rplay-live-dl{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📼</text></svg>">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">📼</span>
+    <span class="name">rplay-live-dl</span>
+  </div>
+  <nav>
+    <a href="/" class="{{ 'active' if request.url.path == '/' }}">总览</a>
+    <a href="/setup" class="{{ 'active' if request.url.path == '/setup' }}">初始设置</a>
+    <a href="/recordings" class="{{ 'active' if request.url.path.startswith('/recordings') }}">录制文件</a>
+    <a href="/logs" class="{{ 'active' if request.url.path.startswith('/logs') }}">运行日志</a>
+  </nav>
+  <div class="badges">
+    {% if credentials_ready %}<span class="badge ok">凭证 ✓</span>{% else %}<span class="badge warn">凭证未配置</span>{% endif %}
+    {% if creators_ready %}<span class="badge ok">主播 ✓</span>{% else %}<span class="badge warn">无主播</span>{% endif %}
+  </div>
+</header>
+
+{% if not complete %}
+<div class="banner setup-banner">
+  ⚠️ 还没有完成初始设置，录制进程不会录制任何内容。
+  <a href="/setup">现在去设置 →</a>
+</div>
+{% endif %}
+
+<main>
+{% block content %}{% endblock %}
+</main>
+
+<footer>
+  <span>rplay-live-dl Web UI</span>
+</footer>
+</body>
+</html>

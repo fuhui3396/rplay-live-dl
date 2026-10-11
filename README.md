@@ -20,6 +20,7 @@
 - [⚠️ v2 Upgrade Notes](#v2-upgrade-notes)
 - [✨ Features](#features)
 - [🚀 Quick Start](#quick-start)
+  - [🖥️ Web UI (optional)](#web-ui)
 - [📘 Usage Guide](#usage-guide)
   - [System Requirements](#system-requirements)
   - [Obtaining Credentials](#obtaining-credentials)
@@ -124,6 +125,46 @@ docker compose up -d
 # 3) Follow logs
 docker compose logs -f
 ```
+
+<a id="web-ui"></a>
+
+### 🖥️ Web UI (optional)
+
+If you would rather not edit files by hand, start the bundled `web` service and
+use the browser at **http://localhost:8099**.
+
+```bash
+docker compose up -d web
+```
+
+The UI guides you through the same setup, in Chinese, with inline instructions and
+the IndexedDB token script:
+
+- **初始设置** — enter `USER_OID` / `REFRESH_TOKEN`, add and remove monitored
+  creators, and edit optional runtime settings. Credentials can be verified against
+  the live RPlay API before saving; a failed verification is never written to disk.
+- **录制文件** — browse, play (HTTP Range seeking) and download recordings, grouped
+  by creator.
+- **运行日志** — tail the recorder's log file with a level filter.
+- **总览** — monitored creator count, credential state, recording count and free space.
+
+Notes:
+
+- Creator edits rewrite `config/config.yaml`, which the recorder re-reads on every
+  poll, so they take effect within one `INTERVAL` without a restart.
+- Settings edits rewrite `.env`, which Docker passes to the recorder at container
+  creation. Run `docker compose up -d --force-recreate` to apply them.
+- The service runs as `${WEB_UID:-1000}:${WEB_GID:-1000}` so files it writes stay
+  editable from the host. Set `WEB_UID`/`WEB_GID` in `.env` to match
+  `id -u` / `id -g` on your machine if they differ from `1000`.
+- **Authentication.** Set both `WEB_USERNAME` and `WEB_PASSWORD` in `.env` before
+  binding to the LAN; the UI then requires an HTTP Basic login (a browser prompt).
+  With both empty the UI is unauthenticated, which is only safe on loopback. The
+  UI can read and write `.env`, so never expose it to the internet — put a reverse
+  proxy with TLS in front of it for remote access.
+
+To reach it from another device on the LAN, the port binding is already
+`8099:8099`; if the connection is refused, open TCP 8099 in the host firewall.
 
 ---
 
@@ -721,6 +762,21 @@ rplay-live-dl/
 │   ├── download.py
 │   ├── env.py
 │   └── rplay.py
+├── web/                          # optional web UI (separate container)
+│   ├── app.py
+│   ├── archive.py
+│   ├── credentials.py
+│   ├── logs.py
+│   ├── paths.py
+│   ├── store.py
+│   ├── static/
+│   │   └── style.css
+│   └── templates/
+│       ├── base.html
+│       ├── index.html
+│       ├── logs.html
+│       ├── recordings.html
+│       └── setup.html
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py
@@ -738,7 +794,12 @@ rplay-live-dl/
 │   ├── test_monitor_events.py
 │   ├── test_rplay.py
 │   ├── test_scheduler.py
-│   └── test_utils.py
+│   ├── test_utils.py
+│   ├── test_web_app.py
+│   ├── test_web_archive.py
+│   ├── test_web_credentials.py
+│   ├── test_web_paths.py
+│   └── test_web_store.py
 ├── images/
 │   ├── creator_oid.png
 │   └── user_oid.png
@@ -751,6 +812,7 @@ rplay-live-dl/
 ├── config.yaml.example
 ├── docker-compose.yaml
 ├── Dockerfile
+├── Dockerfile.web
 ├── main.py
 ├── poetry.lock
 ├── pyproject.toml
